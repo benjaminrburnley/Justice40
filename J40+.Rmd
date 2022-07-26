@@ -10,7 +10,6 @@ install.packages("tidyverse")
 install.packages("tidycensus")
 install.packages("tigris")
 install.packages("sf")
-install.packages("rgdal")
 install.packages("yardstick")
 install.packages("cvms")
 
@@ -18,8 +17,8 @@ install.packages("cvms")
 library(tidyverse)
 library(tidycensus)
 library(tigris)
-library(sf)
-library(rgdal)
+#library(sf)
+#library(rgdal)
 library(yardstick)
 library(cvms)
 
@@ -30,7 +29,7 @@ options(tigris_use_cache = TRUE)
 
 ```{r}
 #load data 
-Justice40Tool_transformed <- read_csv("~/Desktop/Projects/Justice40/Justice40Tool_transformed.csv")
+Justice40Tool_transformed <- read_csv("~/Desktop/Projects/Justice40Tool_transformed.csv")
 data <- as.tibble(Justice40Tool_transformed)
 head(data)
 ```
@@ -148,26 +147,43 @@ j40_select = j40_race %>%
 levels = c("0%","5%", "10%", "15%", "20%", "25%", "30%", "35%", "40%", "45%","50%", "55%", "60%", "65%", "70%","75%","80%","85%","90%","95%","100%")
 j40_select$percentile <- factor(j40_select$percentile, levels = levels)
 j40_select$definition_m_pctl = as.factor(j40_select$definition_m_pctl)
+
+# Grist Visualization Replication 1 
+ggplot(j40_select, aes(x = percentile, fill = definition_m_pctl))+
+  geom_bar(position = "fill")+
+  scale_y_continuous(name ="% of Tracts Disadvantaged", labels =  scales::percent)+
+  scale_fill_discrete(name = "Census Tract Designation", labels = c("Not Disadvantaged", "Disadvantaged"))+
+  labs(
+      title = "Are more diverse census tracts more likely to be considered disadvanted?",
+      x = "Percent of Census Tract that is Non-White",
+      caption = "Replication of visualization by Clayton Aldern/The Grist")+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 90),
+        legend.position = "bottom",
+        legend.title = element_blank(),
+        legend.text = element_text(size = 8))
+```
+
+
+```{r}
+ggplot(j40_select, aes(x = percentile, fill = definition_m_pctl))+
+  geom_bar()+
+  scale_fill_discrete(name = "Census Tract Designation", labels = c("Not Disadvantaged", "Disadvantaged"))+
+  labs(
+      title = "Census Tracts by Disadvantaged Status and Percent Non-White",
+      x = "Percent of Census Tract that is Non-White",
+      y = "Number of Census Tracts",
+      caption = "Replication of visualization by Clayton Aldern/The Grist")+
+  theme_minimal()+
+    theme(axis.text.x = element_text(angle = 90),
+        legend.position = "bottom",
+        legend.title = element_blank(),
+        legend.text = element_text(size = 8))
+```
+
+```{r}
+missing_tracts = j40_race = data %>%
+    anti_join(tract_race, by = c("geoid10_tract" = "GEOID"))
   
-
-
-ggplot(j40_select, aes(x = percentile, fill = definition_m_pctl))+
-  geom_bar(position = "fill") 
-
-
-ggplot(j40_select, aes(x = percentile, fill = definition_m_pctl))+
-  geom_bar()
-
-
-test = j40_race%>%
-  select(geoid10_tract,county,state)
-
-test2 = Justice40Tool_transformed %>%
-  anti_join()
-
-test3 = j40_race %>%
-  filter(definition_m_pctl == 0,
-         white_pct < .25)%>%
-  select(geoid10_tract, tract, county, state,med_hh_inc_in_the_past_12_months_pctl, black_pct)
 ```
 
