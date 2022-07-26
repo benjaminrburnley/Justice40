@@ -1,0 +1,104 @@
+---
+title: "Justice40+: Adding Racial Demographics and Census Tract Shape Files to the J40 ToolR."
+author: "Ben Burnley"
+date: "7/25/2022"
+output: html_document
+---
+```{r}
+# install packages 
+install.packages("tidycensus")
+install.packages("tigris")
+install.packages("sf")
+install.packages("rgdal")
+install.packages("yardstick")
+
+# load packages
+library(tidyverse)
+library(tidycensus)
+library(tigris)
+library(sf)
+library(rgdal)
+library(yardstick)
+
+
+# options 
+options(tigris_use_cache = TRUE)
+```
+
+```{r}
+#load data 
+Justice40Tool_transformed <- read_csv("Desktop/Projects/Justice40/Justice40Tool_transformed.csv")
+data <- as.tibble(Justice40Tool_transformed)
+head(data)
+```
+```{r}
+
+# pulling census data from U.S. Census Bureau API via tidycensus
+
+#setting census API key. This is my personal key from the census bureau. 
+credential <- Sys.getenv("7cbd3daa5e7971ae8c363192b9e829a4d16a5567")
+
+# selecting the race variables we are interested in from the 2020 ACS. This is currently the most up to date estimate
+race_vars <- c(
+  White = "B03002_003",
+  Black = "B03002_004",
+  Native = "B03002_005",
+  Asian = "B03002_006",
+  HIPI = "B03002_007",
+  Hispanic = "B03002_012"
+)
+
+# pulling race variables from ACS by census tract
+tract_race = get_acs(
+    geography = "tract",
+    state = state.abb,
+    variables = race_vars,
+    summary_var = "B03002_001",
+    year = 2019, 
+    output = "wide",
+    key = credential,
+    geometry = TRUE    #includes the shape file for each tract
+    ) %>%
+  separate(NAME, 
+           into = c("tract", "county", "state"),   #separates the NAME column into constituent parts
+           sep = ", ")
+head(tract_race)
+```
+
+```{r}
+# merging process
+# change class of GEOID
+j40_race = data %>%
+    left_join(tract_race, by = c("geoid10_tract" = "GEOID"))
+head(j40_race)
+#Head of J40 Tool with race variables added for each tract
+```
+```{r}
+# create percentage variables 
+j40_race = j40_race %>%
+mutate(white_pct = WhiteE/summary_est, 
+       black_pct = BlackE/summary_est,
+       native_pct = NativeE/summary_est,
+       asian_pct = AsianE/summary_est,
+       hipi_pct = HIPIE/summary_est,
+       hispanic_pct = HispanicE/summary_est,
+       majority_minority = if_else(white_pct < .50, 1, 0))
+```
+
+```{r}
+#simple table of Justice40 disadvantaged communities vs. majority-minority communites
+
+m_disadvantaged = j40_race$definition_m_pctl
+maj_min_communities = j40_race$majority_minority
+outcomes = table(m_disadvantaged, maj_min_communities)
+outcomes
+```
+
+This tells us that of the 23,264 majority-minority census tracts in the data, Justice40 identifices 14,403 (61.9%) of them as disadvantaged.
+
+
+```{r}
+#visualization of the matrix of outcomes
+conf_mat(outcomes)
+```
+
