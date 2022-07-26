@@ -6,11 +6,13 @@ output: html_document
 ---
 ```{r}
 # install packages 
+install.packages("tidyverse")
 install.packages("tidycensus")
 install.packages("tigris")
 install.packages("sf")
 install.packages("rgdal")
 install.packages("yardstick")
+install.packages("cvms")
 
 # load packages
 library(tidyverse)
@@ -19,6 +21,7 @@ library(tigris)
 library(sf)
 library(rgdal)
 library(yardstick)
+library(cvms)
 
 
 # options 
@@ -27,12 +30,11 @@ options(tigris_use_cache = TRUE)
 
 ```{r}
 #load data 
-Justice40Tool_transformed <- read_csv("Desktop/Projects/Justice40/Justice40Tool_transformed.csv")
+Justice40Tool_transformed <- read_csv("~/Desktop/Projects/Justice40/Justice40Tool_transformed.csv")
 data <- as.tibble(Justice40Tool_transformed)
 head(data)
 ```
 ```{r}
-
 # pulling census data from U.S. Census Bureau API via tidycensus
 
 #setting census API key. This is my personal key from the census bureau. 
@@ -82,23 +84,90 @@ mutate(white_pct = WhiteE/summary_est,
        asian_pct = AsianE/summary_est,
        hipi_pct = HIPIE/summary_est,
        hispanic_pct = HispanicE/summary_est,
-       majority_minority = if_else(white_pct < .50, 1, 0))
+       majority_minority = if_else(white_pct < .50, 1, 0),
+       non_white_pct = (summary_est - WhiteE)/summary_est)
 ```
 
 ```{r}
 #simple table of Justice40 disadvantaged communities vs. majority-minority communites
-
-m_disadvantaged = j40_race$definition_m_pctl
+j40_disadvantaged = j40_race$definition_m_pctl
 maj_min_communities = j40_race$majority_minority
-outcomes = table(m_disadvantaged, maj_min_communities)
+outcomes = table(j40_disadvantaged, maj_min_communities)
 outcomes
 ```
 
-This tells us that of the 23,264 majority-minority census tracts in the data, Justice40 identifices 14,403 (61.9%) of them as disadvantaged.
+This tells us that of the 23,264 majority-minority census tracts in the data, Justice40 identifies 61.9% of them as disadvantaged.
+
+Additionally, of the 22,543 disadvantaged communities identified by Justice40, 63.9% of them are majority-minority.
 
 
 ```{r}
 #visualization of the matrix of outcomes
-conf_mat(outcomes)
+outcomes_m = conf_mat(outcomes)
+autoplot(outcomes_m)+
+  labs(x = "Majority-Minority Community",
+       y = "Justice 40 Disadvantaged",
+       title = "Race and Justice40 Disadvantaged Status")
+```
+
+```{r}
+# another visualization option 
+outcomes_tibble = as_tibble(outcomes)
+outcomes_tibble
+plot_confusion_matrix(outcomes_tibble, target_col = "j40_disadvantaged", prediction_col = "maj_min_communities", counts_col = "n")+
+  labs(x = "Justice40 Disadvantaged Communities",
+       y = "Majority-Minority Communities",
+       title = "Race and Justice40 Disadvantaged Status")
+```
+
+```{r}
+j40_select = j40_race %>%
+  select(definition_m_pctl,non_white_pct)%>%
+  filter(!is.na(non_white_pct)) %>%
+  mutate(percentile = if_else(non_white_pct >= 0.00 & non_white_pct< 0.05 , "0%",
+                              if_else(non_white_pct >= 0.05 & non_white_pct < 0.10, "5%",
+                              if_else(non_white_pct >= 0.10 & non_white_pct < 0.15, "10%",
+                              if_else(non_white_pct >= 0.15 & non_white_pct < 0.20, "15%",
+                              if_else(non_white_pct >= 0.20 & non_white_pct < 0.25, "20%",
+                              if_else(non_white_pct >= 0.25 & non_white_pct < 0.30, "25%",
+                              if_else(non_white_pct >= 0.30 & non_white_pct < 0.35, "30%",
+                              if_else(non_white_pct >= 0.35 & non_white_pct < 0.40, "35%",
+                              if_else(non_white_pct >= 0.40 & non_white_pct < 0.45, "40%",
+                              if_else(non_white_pct >= 0.45 & non_white_pct < 0.50, "45%",
+                              if_else(non_white_pct >= 0.50 & non_white_pct < 0.55, "50%",
+                              if_else(non_white_pct >= 0.55 & non_white_pct < 0.60, "55%",
+                              if_else(non_white_pct >= 0.60 & non_white_pct < 0.65, "60%",
+                              if_else(non_white_pct >= 0.65 & non_white_pct < 0.70, "65%",
+                              if_else(non_white_pct >= 0.70 & non_white_pct < 0.75, "70%",
+                              if_else(non_white_pct >= 0.75 & non_white_pct < 0.80, "75%",
+                              if_else(non_white_pct >= 0.80 & non_white_pct < 0.85, "80%",
+                              if_else(non_white_pct >= 0.85 & non_white_pct < 0.90, "85%",
+                              if_else(non_white_pct >= 0.90 & non_white_pct < 0.95, "90%",
+                              if_else(non_white_pct >= 0.95 & non_white_pct < 1.00, "95%",
+                              "100%")))))))))))))))))))))
+levels = c("0%","5%", "10%", "15%", "20%", "25%", "30%", "35%", "40%", "45%","50%", "55%", "60%", "65%", "70%","75%","80%","85%","90%","95%","100%")
+j40_select$percentile <- factor(j40_select$percentile, levels = levels)
+j40_select$definition_m_pctl = as.factor(j40_select$definition_m_pctl)
+  
+
+
+ggplot(j40_select, aes(x = percentile, fill = definition_m_pctl))+
+  geom_bar(position = "fill") 
+
+
+ggplot(j40_select, aes(x = percentile, fill = definition_m_pctl))+
+  geom_bar()
+
+
+test = j40_race%>%
+  select(geoid10_tract,county,state)
+
+test2 = Justice40Tool_transformed %>%
+  anti_join()
+
+test3 = j40_race %>%
+  filter(definition_m_pctl == 0,
+         white_pct < .25)%>%
+  select(geoid10_tract, tract, county, state,med_hh_inc_in_the_past_12_months_pctl, black_pct)
 ```
 
