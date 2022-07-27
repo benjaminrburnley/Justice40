@@ -12,6 +12,7 @@ install.packages("tigris")
 install.packages("sf")
 install.packages("yardstick")
 install.packages("cvms")
+install.packages("naniar")
 
 # load packages
 library(tidyverse)
@@ -21,6 +22,7 @@ library(tigris)
 #library(rgdal)
 library(yardstick)
 library(cvms)
+library(naniar)
 
 
 # options 
@@ -182,8 +184,21 @@ ggplot(j40_select, aes(x = percentile, fill = definition_m_pctl))+
 ```
 
 ```{r}
-missing_tracts = j40_race = data %>%
-    anti_join(tract_race, by = c("geoid10_tract" = "GEOID"))
-  
-```
+## missingness analysis
+#get fip codes
+fips_codes_simple = fips_codes%>%
+  select(state_code,state_name) %>%
+  distinct()
+# where are the missing ACS tracts from
+missing_tracts = j40_race %>%
+  anti_join(tract_race, by = c("geoid10_tract" = "GEOID"))%>%
+  select(geoid10_tract, definition_m_pctl)%>%
+  mutate(fip = str_extract(geoid10_tract, "[0-9]{2}"))%>%
+  left_join(fips_codes_simple, by = c("fip" = "state_code"))%>% 
+  group_by(state_name) %>% 
+  summarize(n = n())
+missing_tracts
+vis_miss(j40_race, warn_large_data = F)
 
+vis_miss(test, warn_large_data = F)
+```
